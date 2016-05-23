@@ -1,0 +1,126 @@
+import java.nio.file.*;
+import java.io.*;
+import java.util.*;
+
+public class ServerEntry {
+
+	/*
+	enum FileState represents file state
+	*/
+	public enum FileState {
+		NOT_SHARED,
+		READ_SHARED,
+		WRITE_SHARED,
+		OWNERSHIP_CHANGE
+	}
+
+	protected String fileName; 				// name of the file
+	protected FileState state;				// state of the file
+	protected String owner;					// store clientIp
+	protected byte[] content;				// content of the file
+	protected int numOfWriter;	 			// count the number of waiting writers who are waiting
+
+	protected Vector<String> readerList;		// clients who involved with the file, 
+												// stores clients' IPS
+
+	public ServerEntry(String name, byte[] content) {
+		this.fileName = name;
+		this.content = content;
+		state = FileState.NOT_SHARED;
+		readerList = new Vector<String>();
+	}
+
+	public ServerEntry(String readerIp, String name, byte[] content) {
+		this(name, content);
+		readerList.add(readerIp);
+		state = FileState.READ_SHARED;
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+	public byte[] getContent() {
+		return content;
+	}
+
+	public boolean isFileName(String fileName) {
+		return this.fileName.equals(fileName);
+	}
+
+	public void setOwner(String owner) {
+		this.owner = owner;
+	}
+
+	public void resetOwner() {
+		this.owner = null;
+	}
+
+	public void addReader(String readerIp) {
+		readerList.add(readerIp);
+	}
+
+	public boolean isNotShared() {
+		return state == FileState.NOT_SHARED;
+	}
+
+	public boolean isReadShared() {
+		return state == FileState.READ_SHARED;
+	}
+
+	public boolean isWriteShared() {
+		return state == FileState.WRITE_SHARED;
+	}
+
+	public boolean isOwnershipChanged() {
+		return state == FileState.OWNERSHIP_CHANGE;
+	}
+
+	public void stateToNotShared() {
+		state = FileState.NOT_SHARED;		
+	}
+
+	public void stateToReadShared() {
+		state = FileState.READ_SHARED;
+	}
+
+	public void stateToWriteShared() {
+		state = FileState.WRITE_SHARED;	
+	}
+
+	public void stateToOwnershipChanged() {
+		state = FileState.OWNERSHIP_CHANGE;		
+	}
+
+	private String stateToString(FileState state) { 
+		if (state == FileState.NOT_SHARED) {
+			return "NOT_SHARED";
+		} else if (state == FileState.READ_SHARED) {
+			return "READ_SHARED";
+		} else if (state == FileState.WRITE_SHARED) {
+			return "WRITE_SHARED";
+		}else {
+			return "OWNERSHIP_CHANGE";
+		}
+	}
+
+	public String toString() {
+		return "File Name: " + fileName + "\n" +
+			   "State    : " + stateToString(state) + "\n" +
+			   "Owner    : " + owner + "\n" + 
+			   "Readers  : " + readerList;
+	}
+
+}
