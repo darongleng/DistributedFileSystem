@@ -24,6 +24,7 @@ public class ServerEntry {
 	protected byte[] content;				// content of the file
 	protected int numOfWriter;	 			// count the number of waiting writers who are waiting
 	protected int clientPort = 0;
+	protected boolean ready;
 
 	protected Vector<String> readerList;		// clients who involved with the file, 
 												// stores clients' IPS
@@ -50,39 +51,45 @@ public class ServerEntry {
 		if (isReadShared() || isNotShared()) {
 			owner = clientIp;							// updates owner
 			state = FileState.WRITE_SHARED;			// updates state
-		} else { // if state is writeshared or ownershipchange
+			System.out.println("State:" + stateToString(state));
+		} else {
+			boolean writebackSuccess = false;
+			ClientInterface fileOwner = null;
 			try {
-				// asks owner to write back
-				ClientInterface fileOwner = connectToClient( owner );
-				fileOwner.writeback();	
-				
-				// wait for owner response
+				fileOwner = connectToClient( owner );
+				writebackSuccess = fileOwner.writeback();	
+			} catch (RemoteException re) {
+				System.out.println("Error when asking an owner to write back.");
+			}
+			
+			if (writebackSuccess) {
+				owner = clientIp; 
+				state = FileState.WRITE_SHARED;		
+			}else {
+				System.out.println("Enters WRITE synchronization.");
 				synchronized (this) {
-					numOfWriter++;
-					System.out.println("Enters WRITE synchronization.");
-					try {
-						while (isWriteShared() || isOwnershipChanged()) {
-							System.out.println("Release monitor.");
+					System.out.println("In WRITE synchronization.");
+					try {	
+						System.out.println("State:" + stateToString(state));
+						while ( isWriteShared() ) {
+							fileOwner.writeback();
+							System.out.println(clientIp + " releases monitor.");
 							wait();
-						}	
+						}
+						System.out.println(clientIp + " is done waiting");
+						owner = clientIp; 
+						state = FileState.WRITE_SHARED;
 					} catch (InterruptedException ie) {
 						System.out.println("InterruptedException when adding writer.");
 					} catch (Exception e) {
+						e.printStackTrace(); 
 						System.out.println("Something gone terribly wrong when adding writer.");
 					}
 				}
-				owner = clientIp; 
-				state = FileState.WRITE_SHARED;
-
-				// send writeback if there are more threads wating
-				numOfWriter--;
-				if (numOfWriter > 0) {
-					fileOwner = connectToClient( owner );
-					fileOwner.writeback();
-				}
-			} catch (RemoteException re) {
-				System.out.println("RemoteException when adding writer.");
 			}
+
+
+			
 		} 
 	}
 
@@ -102,7 +109,6 @@ public class ServerEntry {
 			return true;
 		}
 	}
-
 
 	private ClientInterface connectToClient(String clientIp) {
 		try {
@@ -139,8 +145,6 @@ public class ServerEntry {
 	public boolean isFileName(String fileName) {
 		return fileName.equals(this.fileName);
 	}
-
-
 
 	public void setOwner(String owner) {
 		this.owner = owner;

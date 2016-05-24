@@ -50,7 +50,6 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
    	// ------------------------- SERVER STARTS HERE -----------------------------
     private int clientPort = 0;					// we'll use this port for connection
 	private Vector<ServerEntry> entryList; 		// stores files that have been read
-	private boolean success;
     
     public FileServer(int port) throws RemoteException {
     	clientPort = port;
