@@ -343,6 +343,8 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
     	}
     }
 
+    // converts FileState to String
+    // helps with testing
     private String stateToString(ClientFileState state) {
         if (state == ClientFileState.INVALID)
             return "INVALID";
