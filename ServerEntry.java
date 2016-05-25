@@ -54,9 +54,8 @@ public class ServerEntry {
 			System.out.println("State:" + stateToString(state));
 		} else {
 			boolean writebackSuccess = false;
-			ClientInterface fileOwner = null;
 			try {
-				fileOwner = connectToClient( owner );
+				ClientInterface fileOwner = connectToClient( owner );
 				writebackSuccess = fileOwner.writeback();	
 			} catch (RemoteException re) {
 				System.out.println("Error when asking an owner to write back.");
@@ -72,6 +71,7 @@ public class ServerEntry {
 					try {	
 						System.out.println("State:" + stateToString(state));
 						while ( isWriteShared() ) {
+							ClientInterface fileOwner = connectToClient( owner );
 							fileOwner.writeback();
 							System.out.println(clientIp + " releases monitor.");
 							wait();
