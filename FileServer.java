@@ -54,7 +54,36 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
     public FileServer(int port) throws RemoteException {
     	clientPort = port;
     	entryList = new Vector<ServerEntry>();
+    	addShutDownHook();
     }
+
+    private void addShutDownHook() {
+    	Runtime.getRuntime().addShutdownHook( new Thread() {
+    		public void run() {
+    			for (int i = 0; i < entryList.size(); i++) {
+    				ServerEntry curEntry = entryList.get(i);
+    				writeToDisk(curEntry.getFileName(), curEntry.getContent());
+    			}
+    		}
+    	});
+    }
+
+
+    // write the given content to disk
+    private void writeToDisk(String fileName, byte[] content) {
+        try {
+            FileOutputStream output = new FileOutputStream(fileName);   
+            output.write(content); 
+            output.close(); 
+        }catch(IOException ioException) {
+            System.out.println("Error: when writing file.");
+            ioException.printStackTrace();
+        }catch(Exception e) {
+            System.out.println("Error: in writeToDisk()");
+            e.printStackTrace();
+        }
+    }
+
 
     public FileContents download( String clientIp, String fileName, String mode )
 		throws RemoteException 
@@ -90,7 +119,7 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 			targetEntry.addReader(clientIp, fileName);
 		else 		
 			targetEntry.addWriter(clientIp, fileName);
-		
+
 		FileContents outputContent = new FileContents( targetEntry.getContent() );
 
 		System.out.println("Sent to client " + clientIp);

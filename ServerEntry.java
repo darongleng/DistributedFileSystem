@@ -143,6 +143,10 @@ public class ServerEntry {
 		return content;
 	}
 
+	public String getFileName() {
+		return fileName;
+	}
+
 	public boolean isFileName(String fileName) {
 		return fileName.equals(this.fileName);
 	}
