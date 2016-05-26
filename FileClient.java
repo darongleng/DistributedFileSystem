@@ -16,8 +16,7 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
 			port = Integer.parseInt( args[1] );
 			if ( port < 5001 || port > 65535 )
 			    throw new Exception( );
-		    }
-		    else
+		    }else
 				throw new Exception( );
 		} catch ( Exception e ) {
 		    System.err.println( "usage: java Client serverIp port" );
@@ -26,7 +25,6 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
 
 		// server IP
 		String serverIp = args[0];
-
 		// set up client registry so that server can find
 		try {     
 		    startRegistry( port );
@@ -79,8 +77,6 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
 
 	private Process commandProcess; 				// this process is used to exec commands
 
-
-	// variables for testing
 	private boolean doneWriting;
 
     public FileClient( String serverIp, int port) throws RemoteException {
@@ -283,6 +279,7 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
     }
 
     // open the file from /tmp/filename directory with "cat"
+    // this function is used for testing only 
     private void readFile() {
         try {
             Thread.sleep(3000);
