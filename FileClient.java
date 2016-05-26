@@ -141,10 +141,11 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
     		// if not in cache
     		if ( !requestName.equals(fileName) || 
                 state == ClientFileState.INVALID  ||
-                (mode.equals("w") && state == ClientFileState.READ_SHARED)) {
+                (requestMode.equals("w") && state == ClientFileState.READ_SHARED)) {
+
                 doneWriting = false;     // client just begins writing
                 boolean success = downloadFileFromServer(requestName, requestMode);
-                System.out.println("Received dowonload response from server.");
+                System.out.println("Received dowonload response from server.");                
     			if (!success) {
     				System.out.println("downloadFileFromServer() fails or file doesn't exist.");
     				continue;
@@ -178,6 +179,7 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
     		state = ClientFileState.INVALID;
     		server.upload(myIp, fileName, fileContent);
     		System.out.println("Uploaded modified file back to the server.");
+            System.out.println(Arrays.toString(fileContent.get()));
     	} catch (Exception e) {
     		e.printStackTrace();
     		System.out.println("Error: in uploadModifiedFile().");

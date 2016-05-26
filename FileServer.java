@@ -63,6 +63,7 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 			System.out.println("Read-Download Request From: " + clientIp + ", fileName: " + fileName + ", mode: " + mode + ".");
 		else 
 			System.out.println("Write-Download Request From: " + clientIp + ", fileName: " + fileName + ", mode: " + mode + ".");
+
 		// check if the mode is valid
 		if ( !mode.equals("r") && !mode.equals("w") ) {
 			System.out.println(mode + ": Unknown download mode. Download request not served.");
@@ -84,18 +85,15 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 				return null;
 			}
 		}
-
-		// if file doesn't exist
-		if (targetEntry == null) 
-			return null;
 			
-		FileContents outputContent = new FileContents( targetEntry.getContent() );	
-
 		if (mode.equals("r")) 
 			targetEntry.addReader(clientIp, fileName);
 		else 		
 			targetEntry.addWriter(clientIp, fileName);
+		
+		FileContents outputContent = new FileContents( targetEntry.getContent() );
 
+		System.out.println("Sent to client " + clientIp);
 		return outputContent;
 	}
 

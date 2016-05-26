@@ -87,11 +87,10 @@ public class ServerEntry {
 					}
 				}
 			}
-
-
 			
 		} 
 	}
+
 
 	public boolean updateContent(FileContents contents) {
 		if ( isNotShared() || isReadShared() )
@@ -100,7 +99,9 @@ public class ServerEntry {
 			System.out.println("Enters UPDATE synchronization.");
 			synchronized (this) {
 				System.out.println("In UPDATE synchronization.");
+				System.out.println("Recieved Content: " + Arrays.toString(contents.get()));
 				this.content = contents.get();
+				System.out.println("My Content: " + Arrays.toString(this.content));
 				invalidateCopies();
 				stateToNotShared();
 				resetOwner();
