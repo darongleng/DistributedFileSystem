@@ -57,6 +57,9 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
     	addShutDownHook();
     }
 
+
+    // this hook will make sure that when the client shut down the application with
+    // control-c, the server will write all of cached files to the disk
     private void addShutDownHook() {
     	Runtime.getRuntime().addShutdownHook( new Thread() {
     		public void run() {
