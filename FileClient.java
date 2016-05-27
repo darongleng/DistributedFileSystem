@@ -87,27 +87,26 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
  		setupUserInfo();							// get user name 
  		cached_file_path = TEMP_DIR+username+".txt";
  		connectToServer(serverIp, port);			// connect to server with rmi lookup
+        addShutdownHook();
     }
 
     public boolean invalidate( ) throws RemoteException {
     	System.out.println("Received invalidation request.");
     	this.state = ClientFileState.INVALID;
-    	System.out.println("file invalidated.");
     	return true;
     }
 
     public boolean writeback( ) throws 	RemoteException {
 
-    	System.out.println("Received write back request.");
-
         if (doneWriting) {
-            System.out.println("Writing file back to the server");
+            System.out.println("Received write back request. Writing file back to server.");
             uploadModifiedFile();  // writeback immedietly
             return true;
         }
 
         state = ClientFileState.RELEASE_OWNERSHIP;
-        System.out.println("I'm still editing. I will write back soon.");    
+        System.out.println("Received write back request. Still editing the file.");
+
         return false;
     }
 
@@ -155,12 +154,10 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
     			if (state == ClientFileState.INVALID)
     				state = ClientFileState.READ_SHARED;
     			openFile();
-    			// readFile();
     		}else { // mode is "w"
     			if (state == ClientFileState.INVALID || state == ClientFileState.READ_SHARED)
     				state = ClientFileState.WRITE_OWNED;    			
-    			openFile();
-				// readFile();		
+    			openFile();		
     		}
     	}
     }
@@ -175,9 +172,7 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
     		state = ClientFileState.INVALID;
     		server.upload(myIp, fileName, fileContent);
     		System.out.println("Uploaded modified file back to the server.");
-            System.out.println(Arrays.toString(fileContent.get()));
     	} catch (Exception e) {
-    		e.printStackTrace();
     		System.out.println("Error: in uploadModifiedFile().");
     	}
     }   
@@ -353,6 +348,17 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
             return "WRITE_OWNED";
         else
             return "RELEASE_OWNERSHIP";
+    }
+
+    // this hook will make sure that when the client shut down the application with
+    // control-c, the server will write all of cached files to the disk
+    private void addShutdownHook() {
+        Runtime.getRuntime().addShutdownHook( new Thread() {
+            public void run() {
+                if (state == ClientFileState.WRITE_OWNED)
+                    uploadModifiedFile();
+            }   
+        });
     }
 
     public String toString() {
