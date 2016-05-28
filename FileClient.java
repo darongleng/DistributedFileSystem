@@ -1,3 +1,9 @@
+/**
+ * FileClient.java:<p>
+ * @author Darong Leng, Chris Knakal
+ * @since 05/24/2016
+ **/
+
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
@@ -5,6 +11,12 @@ import java.net.*;
 import java.rmi.*;
 import java.rmi.server.*;
 import java.rmi.registry.*;
+
+/**
+ * This class is run by a user. Once it is run, it will keep asking the user what files they want to open.
+ * Some of its features are writing file back to the server and invalidating the current files,
+ * and openinng up emacs.
+ **/
 
 public class FileClient extends UnicastRemoteObject	implements ClientInterface {
 
@@ -72,16 +84,24 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
 	private String myIp;                      // IP of client
 	private String cached_file_path = "";     // cached file path
     private ServerInterface server = null;    // will store RMI server object
-	private final String TEMP_DIR = "/tmp/";  // path to /tmp
-	private final String EMACS = "emacs";     // emacs command
 
-	private Process commandProcess; 				// this process is used to exec commands
+    private boolean doneWriting;            // indicates whether 
 
-	private boolean doneWriting;
+    private final String TEMP_DIR = "/tmp/";  // path to /tmp
+    private final String EMACS = "emacs";     // emacs command
 
+    /**
+     * it set state of cached file to INVALID
+     * sets up username and user IP 
+     * add a shut down hook so that when the server is closed with Ctrl^C,
+     * the client will sends its cached file back to the server.
+     * @param String serverIp is IP of the server
+     * @param int port is the port that will be used to connect to the client
+     * @throws RemoteException
+     */   
     public FileClient( String serverIp, int port) throws RemoteException {
- 		fileName = "";
- 		mode = "";
+ 		fileName = null;
+ 		mode = null;
  		owner = false;
  		state = ClientFileState.INVALID;   	
  		setupUserInfo();							// get user name 
@@ -90,12 +110,22 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
         addShutdownHook();
     }
 
+    /**
+     * it sets the state of the cache to INVALID
+     * @throw RemoteException
+     */   
     public boolean invalidate( ) throws RemoteException {
     	System.out.println("Received invalidation request.");
     	this.state = ClientFileState.INVALID;
     	return true;
     }
 
+    /**
+     * it sets the state of the cache to RELEASE_OWNERSHIP
+     * if the client is already done writing, it uploads the file back
+     * to the server immediately
+     * @throw RemoteException
+     */
     public boolean writeback( ) throws 	RemoteException {
 
         if (doneWriting) {
@@ -110,6 +140,16 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
         return false;
     }
 
+
+    /**
+     * It enters a loop that keep asking for file name and access mode
+     * before sending any request to the server, it first checks user inputs
+     * it checks whether access mode is known.
+     * it checks whether the current cached file needs to be uploaded to server.
+     * it checks if the requested file is already cached 
+     * if it is not, it will download it from the server.
+     * it sets state of the cache accordingly
+     */
     public void run() {
     	while (true) {
     		// gets file name
@@ -164,8 +204,10 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
 
 
     // ---------------------- PRIVATE FUNCTIONS --------------------------
-
-    // uploads file to the server
+    /**
+     * it first reads the content from the disk
+     * it then uploads file to the server
+     */
     private void uploadModifiedFile() {
     	try {	    		
     		FileContents fileContent = new FileContents( getFileContent(cached_file_path) );
@@ -177,7 +219,12 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
     	}
     }   
 
-    // download file from server
+    /**
+     * it sends a download request to the server
+     * if server doesn't have the file it will return NULL
+     * if it gets some content from the server it will write the client disk
+     * and changes access mode accordingly
+     */
     private boolean downloadFileFromServer(String fileName, String mode) {
     	try {
     		// download content from server
@@ -205,7 +252,9 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
     	}
     }
 
-    // write the given content to disk
+    /**
+     * write the given content to disk
+     */
     private void writeToDisk(byte[] content) {
         try {
             changeFileAccess("w");      //change file access before write, otherwise expception is thrown
@@ -221,8 +270,9 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
         }
     }
 
-    // read content from a file on disk
-    // fileName may also include path to the file
+     /**
+     * read content from a file on disk
+     */   
     private byte[] getFileContent(String fileName) {
         try {
             File file = new File(fileName);
@@ -236,8 +286,10 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
         }
     } 
 
-    // change file access mode
-    // ex. chmod 400 file.txt
+    /**
+     * it changes file access mode by using chmod
+     * a process will be created to change file access mode
+     */   
     private void changeFileAccess(String mode) {
         try {
             Runtime runtime = Runtime.getRuntime();
@@ -256,12 +308,17 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
         }
     }
 
-    // blocks until done editing
-    // open the file from /tmp/filename directory "emacs"
+    /**
+     * it opens a file with emacs
+     * a process will be created when opening emacs
+     * it is blocked until the user closes the emacs
+     * and sets doneWriting field to true
+     * it uploads file back to server if neccesary
+     */    
     private void openFile() {
         try {
             Runtime runtime = Runtime.getRuntime();
-            commandProcess = runtime.exec(EMACS + " " + cached_file_path);
+            Process commandProcess = runtime.exec(EMACS + " " + cached_file_path);
             commandProcess.waitFor();
             // check to see if server needs the file
             if (state == ClientFileState.RELEASE_OWNERSHIP) {
@@ -273,13 +330,15 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
         }
     }
 
-    // open the file from /tmp/filename directory with "cat"
-    // this function is used for testing only 
+    /**
+     * open the file from /tmp/filename directory with "cat"
+     * this function is used for testing only 
+     */
     private void readFile() {
         try {
             Thread.sleep(3000);
             Runtime runtime = Runtime.getRuntime( );        // get runTime
-            commandProcess = runtime.exec("cat " + cached_file_path);
+            Process commandProcess = runtime.exec("cat " + cached_file_path);
             InputStream input = commandProcess.getInputStream();   
             BufferedReader bufferedInput
                     = new BufferedReader( new InputStreamReader( input ) );
@@ -300,7 +359,10 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
         }
     }
 
-    // connect to server
+    /**
+     * connects to the server via RMI lookup and saves server proxy to
+     * server field
+     */
     private void connectToServer(String serverIp, int port) {
         // connect to server
         try {
@@ -312,7 +374,10 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
         }
     }
 
-    // gets client info
+    /**
+     * gets user name from the system and saves it to a username field
+     * get user IP and saves it to myIp field
+     */
     private void setupUserInfo() {
         try {           
             username = System.getProperty("user.name");
@@ -322,23 +387,10 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
         }
     }
 
-    // check if a process is running
-    private boolean isProcessAlive(Process process) {
-    	try {
-    		int exitValue = process.exitValue();
-            if (exitValue == 0)
-                System.out.println("process died.");
-            else 
-                System.out.println("process is still alive.");
-    		return exitValue != 0; 
-    	} catch (IllegalThreadStateException e) {
-    		// if process is still running, this execption is thrown
-    		return true; // to indicate process is still alive
-    	}
-    }
-
-    // converts FileState to String
-    // helps with testing
+    /**
+     * converts FileState to String
+     * helps with testing
+     */
     private String stateToString(ClientFileState state) {
         if (state == ClientFileState.INVALID)
             return "INVALID";
@@ -350,8 +402,10 @@ public class FileClient extends UnicastRemoteObject	implements ClientInterface {
             return "RELEASE_OWNERSHIP";
     }
 
-    // this hook will make sure that when the client shut down the application with
-    // control-c, the server will write all of cached files to the disk
+    /**
+     * this hook will make sure that when the client shut down the application with
+     * control-c, the server will write all of cached files to the disk
+     */
     private void addShutdownHook() {
         Runtime.getRuntime().addShutdownHook( new Thread() {
             public void run() {

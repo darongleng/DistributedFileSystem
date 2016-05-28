@@ -1,9 +1,23 @@
+/**
+ * FileServer.java:<p>
+ * @author Darong Leng, Chris Knakal
+ * @since 05/24/2016
+ **/
+
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import java.rmi.*;
 import java.rmi.server.*;
 import java.rmi.registry.*;
+
+/**
+ * This class server is used to accept requests from clients. It is used to manages the cache and decides
+ * which client will get the file. Some of its features are adding readers to cache objects, sending owner a 
+ * writeback request, sending invalidations to readers, and updating the content of the cache
+ *
+ * It has information of all cached files
+ **/
 
 public class FileServer extends UnicastRemoteObject implements ServerInterface {
 
@@ -44,21 +58,38 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 		}
     }
 
-
-
-
    	// ------------------------- SERVER STARTS HERE -----------------------------
     private int clientPort = 0;					// we'll use this port for connection
 	private Vector<ServerEntry> entryList; 		// stores files that have been read
     
+
+    /**
+     * saves client port
+     * instantiates vector
+     * add a shut down hook so that when the server is closed with Ctrl^C,
+     * the server will saves everything in memory back into disk
+     * @param int port is the port that will be used to connect to the client
+     * @throws RemoteException
+     */
     public FileServer(int port) throws RemoteException {
     	clientPort = port;
     	entryList = new Vector<ServerEntry>();
     	addShutdownHook();
     }
 
+    /**
+     * add clientIp to the cache list or
+     * gives write permission to the client
+     * and finally returns the content to the client
+     * 
+     * @param String clientIp is IP name of the client
+     * @param String fileName is name of the file client wants to access
+     * @param String mode is "r" for read, "w" for write
+     * @return FileContent if file is found, otherwise null
+     * @throws RemoteException
+     */
     public FileContents download( String clientIp, String fileName, String mode )
-		throws RemoteException 
+	throws RemoteException 
 	{
 		if (mode.equals("r"))
 			System.out.println("Read-Download Request From: " + clientIp + ", fileName: " + fileName + ", mode: " + mode + ".");
@@ -76,7 +107,7 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 		if ( targetEntry == null ) {
 			// load data of filefrom disk to memory 
 			try {
-				targetEntry = new ServerEntry(clientPort, fileName);
+				targetEntry = new ServerEntry(fileName);
 				entryList.add(targetEntry);
 			} catch (IOException ie) {
 				System.out.println("Error: IOException in download()");
@@ -92,16 +123,23 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 		else 		
 			addWriter(targetEntry, clientIp, fileName);
 
-		FileContents outputContent = new FileContents( targetEntry.getContent() );
+		FileContents outputContent = new FileContents( targetEntry.content );
 		System.out.println("Sends content to client " + clientIp);
 
 		return outputContent;
 	}
 
-
-
+	/**
+     * updates the content of cache if method is called
+     * 
+     * @param String clientIp is IP name of the client
+     * @param String fileName is name of the file client wants to access
+     * @param FileContents content of the file
+     * @return boolean true if updates successfully, false otherwise
+     * @throws RemoteException
+     */
     public boolean upload( String clientIp, String fileName, FileContents contents ) 
-    	throws RemoteException 
+    throws RemoteException 
 	{	
 		System.out.println("Received upload request from: " + clientIp + ".");
 		
@@ -117,7 +155,10 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 	}
 
 
-	// add client to reader list
+	/**
+     * add clientIp to the entry's reader list
+     * and sets entry's state to READ_SHARED if neccessary
+     */
 	private void addReader(ServerEntry entry, String clientIp, String fileName) {
 		if (!entry.readerList.contains( clientIp )) 
 			entry.readerList.add(clientIp); 	
@@ -125,8 +166,12 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 			entry.stateToReadShared();
 	}
 
-	// give client the write permission
-	public void addWriter(ServerEntry entry, String clientIp, String fileName) {
+	/**
+     * it gives client the write permission immediately or
+     * has them wait.
+     * It sets entry's state to WRITE_SHARED if neccessary
+     */
+	private void addWriter(ServerEntry entry, String clientIp, String fileName) {
 		if (entry.isReadShared() || entry.isNotShared()) {
 			entry.setOwner( clientIp );					// updates owner
 			entry.stateToWriteShared( );						// updates state
@@ -176,6 +221,14 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 		} 
 	}
 
+
+	/**
+	 * It updates the content of the cache
+	 * sets state to NOT_SHARED, resets the owner, invalidates all readers
+	 * It also notify all of the waiting threads
+     * return false if update is not successful
+     * return true if update is sucessful
+     */
 	private boolean updateContent(ServerEntry entry, FileContents contents) {
 		if ( entry.isNotShared() || entry.isReadShared() )
 			return false;
@@ -192,6 +245,12 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 		}
 	}
 
+	/**
+	 * It iterates through entry's reader list
+	 * It first connect to client via RMI lookup
+	 * and then calls client.invalidate()
+	 * once done iteration, it removes all element from the reader list
+     */
 	private void invalidateCopies(ServerEntry entry) {
 		Vector<String> readerList = entry.readerList;
 		for (int i = 0; i < readerList.size(); i++) {
@@ -206,7 +265,9 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 		readerList.removeAllElements();
 	}
 
-
+	/**
+	 * It connects to a clientIp via RMI lookup
+     */
 	private ClientInterface connectToClient(String clientIp) {
 		try {
 		    ClientInterface client =  ( ClientInterface )
@@ -218,6 +279,9 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 		}
 	}
 
+	/**
+	 * Iterates throught entryList to see if a file has been cached based on fileName
+     */
 	private ServerEntry getEntry(String fileName) {
 		for (int i = 0; i < entryList.size(); i++) {
 			ServerEntry curEntry = entryList.get(i);
@@ -228,21 +292,24 @@ public class FileServer extends UnicastRemoteObject implements ServerInterface {
 		return null;
 	}
 
-	// this hook will make sure that when the client shut down the application with
-    // control-c, the server will write all of cached files to the disk
+	/**
+	 * this hook will make sure that when the client shut down the application with
+	 * control-c, the server will write all of cached files to the disk
+	 */
     private void addShutdownHook() {
     	Runtime.getRuntime().addShutdownHook( new Thread() {
     		public void run() {
     			for (int i = 0; i < entryList.size(); i++) {
     				ServerEntry curEntry = entryList.get(i);
-    				writeToDisk(curEntry.getFileName(), curEntry.getContent());
+    				writeToDisk(curEntry.getFileName(), curEntry.content);
     			}
     		}
     	});
     }
 
-
-    // write the given content to disk
+    /**
+	 * write the given content to disk
+	 */ 
     private void writeToDisk(String fileName, byte[] content) {
         try {
             FileOutputStream output = new FileOutputStream(fileName);   
