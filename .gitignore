@@ -1,4 +1,4 @@
 *.class
 .pdf
 .txt
-
+.DS_Store
